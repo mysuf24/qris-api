@@ -3,6 +3,7 @@ package controller
 import (
 	"log"
 	"net/http"
+	"qris-api/config"
 	"qris-api/model"
 
 	"github.com/gin-gonic/gin"
@@ -23,15 +24,14 @@ func CreateQRIS(c *gin.Context) {
 		return
 	}
 
-
-	//validasi channel code 
+	//validasi channel code
 	if _, ok := allowedChannel[req.AdditionalInfo.ChannelCode]; !ok {
 		log.Printf("[QRIS] Invalid Channel Code: %s", req.AdditionalInfo.ChannelCode)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channelCode"})
 		return
 	}
 
-	//simulasi generate qr 
+	//simulasi generate qr
 	qrString := "QRIS:" + req.MerchantID + ":" + req.PartnerReferenceNo
 
 	log.Printf("[QRIS] Generated QR for Merchant: %s, RefNo: %s", req.MerchantID, req.PartnerReferenceNo)
@@ -43,4 +43,22 @@ func CreateQRIS(c *gin.Context) {
 			"status":   "generated",
 		},
 	})
+
+	data := model.QRISRequestModel{
+		PartnerReferenceNo: req.PartnerReferenceNo,
+		AmountValue:        req.Amount.Value,
+		AmountCurrency:     req.Amount.Currency,
+		MerchantID:         req.MerchantID,
+		ValidityPeriod:     req.ValidityPeriod,
+		BillDate:           req.AdditionalInfo.BillDate,
+		BillDescription:    req.AdditionalInfo.BillDescription,
+		ChannelCode:        req.AdditionalInfo.ChannelCode,
+		PhoneNo:            req.AdditionalInfo.PhoneNo,
+	}
+
+	if err := config.DB.Create(&data).Error; err != nil {
+		log.Printf("[QRIS] Failed to save to DB: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save transaction"})
+		return
+	}
 }
